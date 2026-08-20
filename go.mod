@@ -1,3 +1,8 @@
-module github.com/mp-core/panel
+module github.com/crypt0mp73/mp-core
 
 go 1.22
+
+require (
+	golang.org/x/crypto v0.32.0
+	modernc.org/sqlite v1.34.5
+)
