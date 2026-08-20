@@ -1,0 +1,65 @@
+name: Build and Release MP-CORE
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on any tag like v1.0.0, v1.0.1, etc.
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Build MP-CORE binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o mp-core-amd64 .
+          chmod +x mp-core-amd64
+          sha256sum mp-core-amd64 > mp-core-amd64.sha256
+      
+      - name: Build for ARM64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o mp-core-arm64 .
+          chmod +x mp-core-arm64
+          sha256sum mp-core-arm64 > mp-core-arm64.sha256
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mp-core-amd64
+            mp-core-amd64.sha256
+            mp-core-arm64
+            mp-core-arm64.sha256
+          name: MP-CORE ${{ github.ref_name }}
+          body: |
+            ## MP-CORE ${{ github.ref_name }}
+            
+            Automated build from commit ${{ github.sha }}
+            
+            ### Files
+            - `mp-core-amd64` — x86_64 Linux (most VPS)
+            - `mp-core-arm64` — ARM64 Linux (Oracle free tier, Raspberry Pi)
+            
+            ### Quick Install
+            ```bash
+            bash <(curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh)
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
