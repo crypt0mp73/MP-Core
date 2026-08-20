@@ -1,29 +1,29 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"strconv"
 )
 
-// Config holds all panel configuration.
-// Values come from environment variables with safe defaults.
 type Config struct {
 	Port      int
 	BasePath  string
 	DBPath    string
 	AdminUser string
 	AdminPass string
+	Domain    string
 }
 
-// Load reads configuration from environment variables,
-// falling back to defaults suitable for local testing.
 func Load() *Config {
 	cfg := &Config{
 		Port:      2053,
 		BasePath:  "/",
-		DBPath:    "mp-core.db", // local by default so `go run .` works without root
+		DBPath:    "mp-core.db",
 		AdminUser: "admin",
 		AdminPass: "admin",
+		Domain:    "",
 	}
 
 	if p := os.Getenv("MP_CORE_PORT"); p != "" {
@@ -43,5 +43,15 @@ func Load() *Config {
 	if pw := os.Getenv("MP_CORE_ADMIN_PASS"); pw != "" {
 		cfg.AdminPass = pw
 	}
+	if d := os.Getenv("MP_CORE_DOMAIN"); d != "" {
+		cfg.Domain = d
+	}
+
 	return cfg
+}
+
+func RandomToken(length int) string {
+	b := make([]byte, length)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
