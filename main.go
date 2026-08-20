@@ -2,33 +2,37 @@ package main
 
 import (
 	"log"
+	"os"
 
-	"github.com/mp-core/panel/config"
-	"github.com/mp-core/panel/database"
-	"github.com/mp-core/panel/web"
+	"github.com/crypt0mp73/mp-core/config"
+	"github.com/crypt0mp73/mp-core/database"
+	"github.com/crypt0mp73/mp-core/web"
 )
+
+var version = "dev"
 
 func main() {
 	log.SetFlags(log.LstdFlags)
-	log.Println("MP-CORE Panel starting...")
+	log.Printf("MP-CORE Panel %s starting...", version)
 
-	// Load configuration (env vars with sane defaults)
 	cfg := config.Load()
 
-	// Initialize SQLite database + run migrations
 	if err := database.Init(cfg.DBPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Seed default admin on first run
 	if err := database.SeedAdmin(cfg.AdminUser, cfg.AdminPass); err != nil {
 		log.Fatalf("Failed to seed admin user: %v", err)
 	}
 
-	// Start web server
-	server := web.NewServer(cfg)
-	log.Printf("MP-CORE listening on :%d", cfg.Port)
+	if err := database.SeedDefaults(); err != nil {
+		log.Printf("Warning: could not seed defaults: %v", err)
+	}
+
+	server := web.NewServer(cfg, version)
+	log.Printf("MP-CORE listening on :%d (base path: %s)", cfg.Port, cfg.BasePath)
 	if err := server.Start(); err != nil {
 		log.Fatalf("Server error: %v", err)
+		os.Exit(1)
 	}
 }
