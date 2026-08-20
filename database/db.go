@@ -426,8 +426,6 @@ type SSHClient struct {
 }
 
 func ListSSHClients() ([]SSHClient, error) {
-	rows, err := DB.Query("SELECT id, username, password, port, enabled, expiry FROM settings WHERE key LIKE 'ssh_client_%'")
-	_ = rows
 	// Using settings table with JSON for simplicity
 	raw := GetSetting("ssh_clients", "[]")
 	var list []SSHClient
