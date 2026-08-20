@@ -1,0 +1,9 @@
+# Compiled binary
+mp-core
+*.exe
+
+# Local database
+*.db
+
+# OS junk
+.DS_Store
