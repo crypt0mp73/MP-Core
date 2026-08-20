@@ -167,4 +167,73 @@ fi
 
 DOWNLOAD_URL=$(echo "$RELEASE_INFO" | python3 -c "
 import sys, json
-data = json.load(sys.stdin
+data = json.load(sys.stdin)
+for asset in data.get('assets', []):
+    if asset['name'] == '${BINARY_NAME}':
+        print(asset['browser_download_url'])
+        break
+" 2>/dev/null)
+
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo -e "${RED}✗ Could not find binary '${BINARY_NAME}' in the release${NC}"
+    echo -e "${YELLOW}  You must build & upload the binary first (see guide).${NC}"
+    exit 1
+fi
+
+VERSION=$(echo "$RELEASE_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name','unknown'))" 2>/dev/null)
+echo -e "${CYAN}  Found version: ${VERSION}${NC}"
+
+curl -fsSL -o /usr/local/mp-core/mp-core "$DOWNLOAD_URL"
+chmod +x /usr/local/mp-core/mp-core
+
+if [ -s /usr/local/mp-core/mp-core ]; then
+    SIZE=$(du -h /usr/local/mp-core/mp-core | cut -f1)
+    echo -e "${GREEN}✓ Downloaded ${BINARY_NAME} (${SIZE})${NC}"
+else
+    echo -e "${RED}✗ Download failed${NC}"
+    exit 1
+fi
+
+# ── Step 5: Systemd service ──────────────────────────────
+echo -e "${CYAN}» Setting up systemd service...${NC}"
+mkdir -p /etc/mp-core
+
+cat > /etc/systemd/system/mp-core.service <<EOF
+[Unit]
+Description=MP-CORE Panel
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/mp-core/mp-core
+Environment=MP_CORE_PORT=${PANEL_PORT}
+Environment=MP_CORE_DB_PATH=/etc/mp-core/mp-core.db
+Environment=MP_CORE_ADMIN_USER=${ADMIN_USER}
+Environment=MP_CORE_ADMIN_PASS=${ADMIN_PASS}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable mp-core >/dev/null 2>&1
+systemctl restart mp-core
+
+sleep 2
+if systemctl is-active --quiet mp-core; then
+    echo ""
+    echo -e "${GREEN}═══════════════════════════════════════${NC}"
+    echo -e "${GREEN}  ✓ MP-CORE installed successfully!    ${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════${NC}"
+    echo -e "  Panel URL: ${CYAN}http://${SERVER_IP:-YOUR_IP}:${PANEL_PORT}${NC}"
+    echo -e "  Username:  ${CYAN}${ADMIN_USER}${NC}"
+    echo -e "  Password:  ${CYAN}${ADMIN_PASS}${NC}"
+    echo -e "  Version:   ${CYAN}${VERSION}${NC}"
+    echo -e "  RAM usage: ${CYAN}~30MB (works on 512MB VPS!)${NC}"
+    echo ""
+else
+    echo -e "${RED}✗ Service failed to start. Check: journalctl -u mp-core${NC}"
+    exit 1
+fi
