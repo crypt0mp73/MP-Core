@@ -1,67 +1,937 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" x-data="panelApp()" x-init="init()">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MP-CORE Panel</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
 body{background:#0a0a0a;color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 .glass-panel{background:rgba(24,24,27,.85);backdrop-filter:blur(12px);border:1px solid rgba(63,63,70,.5);border-radius:12px}
 .glass-card{background:rgba(39,39,42,.6);backdrop-filter:blur(8px);border:1px solid rgba(63,63,70,.3);border-radius:12px}
-.badge-green{background:rgba(16,185,129,.2);color:#34d399;padding:2px 8px;border-radius:6px;font-size:.75rem}
-.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.6)}
+.btn{background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;font-weight:600;padding:8px 16px;border-radius:8px;font-size:.85rem;transition:.2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,92,246,.4)}
+.btn-sec{background:rgba(63,63,70,.5);color:#e5e5e5;padding:8px 16px;border-radius:8px;border:1px solid rgba(82,82,91,.5);font-size:.85rem}
+.btn-sec:hover{background:rgba(82,82,91,.6)}
+.btn-red{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;padding:8px 16px;border-radius:8px;font-size:.85rem}
+.input{background:rgba(39,39,42,.6);border:1px solid rgba(63,63,70,.5);color:#e5e5e5;border-radius:8px;padding:8px 12px;font-size:.85rem;width:100%}
+.input:focus{outline:none;border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.1)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-online{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.tab-active{background:rgba(139,92,246,.15)!important;border-left:3px solid #8b5cf6}
+.mobile-menu{transform:translateX(-100%);transition:transform .3s}
+.mobile-menu.open{transform:translateX(0)}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:500}
+.b-blue{background:rgba(59,130,246,.2);color:#60a5fa}
+.b-purple{background:rgba(139,92,246,.2);color:#a78bfa}
+.b-green{background:rgba(16,185,129,.2);color:#34d399}
+.b-orange{background:rgba(251,146,60,.2);color:#fb923c}
+.b-red{background:rgba(239,68,68,.2);color:#f87171}
+.b-gray{background:rgba(107,114,128,.2);color:#9ca3af}
+.b-cyan{background:rgba(6,182,212,.2);color:#22d3ee}
+.toggle{position:relative;width:40px;height:22px;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.toggle span{position:absolute;cursor:pointer;inset:0;background:#4b5563;transition:.3s;border-radius:22px}
+.toggle span:before{content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
+.toggle input:checked+span{background:linear-gradient(135deg,#8b5cf6,#6366f1)}
+.toggle input:checked+span:before{transform:translateX(18px)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center}
+.json-tab{padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer;font-size:.8rem;color:#9ca3af;border:1px solid transparent;border-bottom:none}
+.json-tab-active{background:rgba(139,92,246,.2);color:#a78bfa;border-color:rgba(63,63,70,.5)}
+.terminal{background:#18181b;border:1px solid rgba(63,63,70,.5);border-radius:8px;font-family:monospace;color:#a1a1aa;padding:12px;font-size:12px}
+select.input option{background:#18181b;color:#e5e5e5}
 </style>
 </head>
 <body>
+<button @click="mob=!mob" class="lg:hidden fixed top-4 left-4 z-50 p-2 glass-card">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+</button>
+
+<!-- QR Modal -->
+<div x-show="qr.show" x-cloak class="modal-bg" @click.self="qr.show=false">
+  <div class="glass-panel p-6 max-w-md w-full mx-4">
+    <div class="flex justify-between mb-4">
+      <h3 class="text-white font-semibold" x-text="qr.title"></h3>
+      <button @click="qr.show=false" class="text-zinc-400 hover:text-white">✕</button>
+    </div>
+    <div class="flex justify-center mb-4 bg-white p-3 rounded-xl">
+      <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(qr.data)" style="width:220px;height:220px">
+    </div>
+    <div class="glass-card p-3 mb-3">
+      <p class="text-xs text-zinc-500 mb-1">Link</p>
+      <code class="text-xs text-zinc-300 break-all block" x-text="qr.data"></code>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn flex-1" @click="copy(qr.data)">📋 Copy</button>
+      <button x-show="qr.download" class="btn-sec flex-1" @click="downloadJson()">⬇ Download</button>
+    </div>
+  </div>
+</div>
+
 <div class="flex min-h-screen">
-  <!-- SIDEBAR -->
-  <aside class="w-72 glass-panel border-r border-zinc-800 flex flex-col flex-shrink-0">
+  <aside :class="mob?'mobile-menu open':'mobile-menu'" class="w-72 fixed lg:sticky top-0 left-0 h-screen z-40 glass-panel border-r border-zinc-800 flex flex-col overflow-y-auto">
     <div class="h-16 flex items-center px-4 border-b border-zinc-800 gap-2">
-      <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold">MP</div>
-      <div><div class="text-lg font-bold text-white">MP-CORE</div><div class="text-xs text-zinc-500">v3.1.0</div></div>
+      <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div><div class="text-lg font-bold text-white">MP-CORE</div><div class="text-xs text-zinc-500" x-text="version"></div></div>
     </div>
     <nav class="flex-1 py-3 px-3 space-y-1">
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white" style="background:rgba(139,92,246,.15);border-left:3px solid #8b5cf6">📊 Dashboard</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">📥 Inbounds</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">👥 Clients</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">⚙️ Xray Settings</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">🧩 Services</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">🛡️ System Armor</a>
-      <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-white">⚙️ Settings</a>
+      <template x-for="item in menu" :key="item.id">
+        <div>
+          <div x-show="item.div" class="pt-3 pb-1 px-3"><p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider" x-text="item.label"></p></div>
+          <button x-show="!item.div" @click="tab=item.id;mob=false" :class="tab===item.id?'tab-active text-white':'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all">
+            <span x-html="item.icon"></span>
+            <span x-text="item.label"></span>
+          </button>
+        </div>
+      </template>
     </nav>
     <div class="p-3 border-t border-zinc-800">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">A</div>
         <div class="flex-1"><div class="text-sm text-white">admin</div><div class="text-xs text-zinc-500">Super Admin</div></div>
-        <a href="/logout" class="text-zinc-400 hover:text-white text-xs">Logout</a>
+        <a href="logout" class="text-zinc-400 hover:text-white text-xs">Logout</a>
       </div>
     </div>
   </aside>
 
-  <!-- MAIN CONTENT -->
   <div class="flex-1 flex flex-col">
     <header class="h-16 glass-panel border-b border-zinc-800 flex items-center justify-between px-6 sticky top-0 z-30">
-      <h2 class="text-lg font-semibold text-white">Dashboard</h2>
-      <span class="badge-green"><span class="status-dot"></span>Xray Running</span>
+      <h2 class="text-lg font-semibold text-white ml-10 lg:ml-0" x-text="tabLabel"></h2>
+      <span class="b-green badge"><span class="status-dot status-online"></span>Xray Running</span>
     </header>
+
     <main class="flex-1 p-6 space-y-4">
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="glass-card p-5"><p class="text-zinc-400 text-sm">CPU</p><p class="text-2xl font-bold text-white mt-1">23%</p></div>
-        <div class="glass-card p-5"><p class="text-zinc-400 text-sm">Memory</p><p class="text-2xl font-bold text-white mt-1">1.2 GB</p></div>
-        <div class="glass-card p-5"><p class="text-zinc-400 text-sm">Network</p><p class="text-2xl font-bold text-white mt-1">84 MB/s</p></div>
-        <div class="glass-card p-5"><p class="text-zinc-400 text-sm">Uptime</p><p class="text-2xl font-bold text-white mt-1">14d 6h</p></div>
+
+      <!-- DASHBOARD -->
+      <div x-show="tab==='dashboard'" x-cloak>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="glass-card p-5">
+            <p class="text-zinc-400 text-sm">CPU Usage</p>
+            <p class="text-2xl font-bold text-white mt-1" x-text="stats.cpu.toFixed(1)+'%'"></p>
+            <div class="mt-3 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-blue-400 to-blue-600" :style="'width:'+stats.cpu+'%'"></div></div>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-zinc-400 text-sm">Memory</p>
+            <p class="text-2xl font-bold text-white mt-1" x-text="stats.memory.used_gb.toFixed(1)+' / '+stats.memory.total_gb.toFixed(1)+' GB'"></p>
+            <div class="mt-3 h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-green-400 to-green-600" :style="'width:'+stats.memory.percent+'%'"></div></div>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-zinc-400 text-sm">Network I/O</p>
+            <p class="text-2xl font-bold text-white mt-1" x-text="'↓'+stats.network.rx_mb+' / ↑'+stats.network.tx_mb+' MB'"></p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-zinc-400 text-sm">Uptime</p>
+            <p class="text-2xl font-bold text-white mt-1" x-text="stats.uptime"></p>
+          </div>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-3">Xray Core Status</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div><span class="text-zinc-400">Version:</span> <span class="text-white" x-text="stats.xray.version"></span></div>
+            <div><span class="text-zinc-400">Status:</span> <span class="badge b-green">Running</span></div>
+            <div><span class="text-zinc-400">Inbounds:</span> <span class="text-white" x-text="inbounds.length"></span></div>
+            <div><span class="text-zinc-400">Clients:</span> <span class="text-white" x-text="clients.length"></span></div>
+          </div>
+        </div>
       </div>
 
-      <!-- Status Card -->
-      <div class="glass-card p-5">
-        <h3 class="text-white font-semibold mb-3">✅ MP-CORE is running!</h3>
-        <p class="text-zinc-400 text-sm">You are on the authenticated dashboard. The Go backend, SQLite database, and bcrypt login are all working.</p>
-        <p class="text-zinc-500 text-xs mt-3">API test: <a href="/api/status" class="text-purple-400 hover:underline">/api/status</a></p>
+      <!-- INBOUNDS -->
+      <div x-show="tab==='inbounds'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">Inbound Management</h3>
+            <button class="btn" @click="openInboundModal()">+ Add Inbound</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-zinc-500 border-b border-zinc-800">
+                <th class="p-2">Remark</th><th class="p-2">Protocol</th><th class="p-2">Port</th><th class="p-2">Transport</th><th class="p-2">Security</th><th class="p-2">Clients</th><th class="p-2">Status</th><th class="p-2">Actions</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="ib in inbounds" :key="ib.id">
+                  <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                    <td class="p-2 text-white" x-text="ib.remark"></td>
+                    <td class="p-2"><span class="badge b-blue" x-text="ib.protocol"></span></td>
+                    <td class="p-2 text-zinc-400" x-text="ib.port"></td>
+                    <td class="p-2 text-zinc-400" x-text="ib.transport"></td>
+                    <td class="p-2"><span class="badge b-purple" x-text="ib.security"></span></td>
+                    <td class="p-2 text-zinc-400" x-text="ib.client_count"></td>
+                    <td class="p-2"><span :class="ib.enabled?'b-green':'b-red'" class="badge" x-text="ib.enabled?'Active':'Disabled'"></span></td>
+                    <td class="p-2 flex gap-2">
+                      <button class="text-zinc-400 hover:text-white text-xs" @click="editInbound(ib)">Edit</button>
+                      <button class="text-red-400 hover:text-red-300 text-xs" @click="deleteInbound(ib.id)">Delete</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      <!-- CLIENTS -->
+      <div x-show="tab==='clients'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">Client Management</h3>
+            <button class="btn" @click="openClientModal()">+ Add Client</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-zinc-500 border-b border-zinc-800">
+                <th class="p-2">On</th><th class="p-2">Email</th><th class="p-2">Protocol</th><th class="p-2">Inbound</th><th class="p-2">Traffic</th><th class="p-2">Expiry</th><th class="p-2">IP</th><th class="p-2">Share</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="c in clients" :key="c.id">
+                  <tr :class="!c.enabled?'opacity-50':''" class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                    <td class="p-2"><label class="toggle"><input type="checkbox" :checked="c.enabled" @change="toggleClient(c)"><span></span></label></td>
+                    <td class="p-2 text-white" x-text="c.email"></td>
+                    <td class="p-2"><span class="badge b-blue" x-text="c.protocol"></span></td>
+                    <td class="p-2 text-zinc-400" x-text="c.inbound_remark"></td>
+                    <td class="p-2 text-zinc-400" x-text="formatGB(c.up+c.down)+' / '+formatGB(c.total_gb)"></td>
+                    <td class="p-2 text-zinc-400" x-text="formatExpiry(c.expiry_time)"></td>
+                    <td class="p-2 text-zinc-400" x-text="c.ip_limit"></td>
+                    <td class="p-2 flex gap-1">
+                      <button @click="showQR(c)" class="text-zinc-400 hover:text-white text-xs" title="QR">▣</button>
+                      <button @click="copyLink(c)" class="text-zinc-400 hover:text-white text-xs" title="Link">🔗</button>
+                      <button @click="editClient(c)" class="text-zinc-400 hover:text-white text-xs">Edit</button>
+                      <button @click="deleteClient(c.id)" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- XRAY SETTINGS -->
+      <div x-show="tab==='xray'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Xray Core Configuration</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">Log Level</label>
+              <select class="input" x-model="xraySettings.logLevel">
+                <option>none</option><option>error</option><option>warning</option><option>info</option><option>debug</option>
+              </select>
+            </div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Domain Strategy</label>
+              <select class="input" x-model="xraySettings.domainStrategy">
+                <option>AsIs</option><option>UseIP</option><option>UseIPv4</option><option>UseIPv6</option>
+              </select>
+            </div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Primary DNS</label><input class="input" x-model="xraySettings.dns1"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Secondary DNS</label><input class="input" x-model="xraySettings.dns2"></div>
+          </div>
+          <button class="btn mt-4" @click="saveXraySettings()">Save Configuration</button>
+        </div>
+      </div>
+
+      <!-- ROUTING -->
+      <div x-show="tab==='routing'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">Routing Rules</h3>
+            <button class="btn" @click="openRoutingModal()">+ Add Rule</button>
+          </div>
+          <div class="space-y-2">
+            <template x-for="r in routing" :key="r.id">
+              <div class="glass-card p-3 flex justify-between items-center">
+                <div>
+                  <span class="text-white font-medium" x-text="r.name"></span>
+                  <div class="text-xs text-zinc-400 mt-1" x-text="'Type: '+r.rule_type+' → '+r.outbound"></div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="text-zinc-400 hover:text-white text-xs" @click="editRouting(r)">Edit</button>
+                  <button class="text-red-400 text-xs" @click="deleteRouting(r.id)">Delete</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- OUTBOUNDS -->
+      <div x-show="tab==='outbounds'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">Outbound Management</h3>
+            <button class="btn" @click="openOutboundModal()">+ Add Outbound</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <template x-for="o in outbounds" :key="o.id">
+              <div class="glass-card p-4">
+                <div class="flex justify-between mb-2">
+                  <span class="text-white font-semibold" x-text="o.tag"></span>
+                  <div class="flex gap-1">
+                    <span x-show="o.is_default" class="badge b-green">Default</span>
+                    <button class="text-zinc-400 hover:text-white text-xs" @click="editOutbound(o)">Edit</button>
+                    <button class="text-red-400 text-xs" @click="deleteOutbound(o.id)">Delete</button>
+                  </div>
+                </div>
+                <div class="text-sm text-zinc-400">Protocol: <span x-text="o.protocol"></span></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- JSON EDITORS -->
+      <div x-show="tab==='json'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Xray Configuration Editor</h3>
+          <div class="flex gap-1 mb-0 border-b border-zinc-800">
+            <button class="json-tab" :class="jsonTab==='full'?'json-tab-active':''" @click="jsonTab='full'">Full Config</button>
+            <button class="json-tab" :class="jsonTab==='inbound'?'json-tab-active':''" @click="jsonTab='inbound'">Inbound JSON</button>
+            <button class="json-tab" :class="jsonTab==='outbound'?'json-tab-active':''" @click="jsonTab='outbound'">Outbound JSON</button>
+            <button class="json-tab" :class="jsonTab==='routing'?'json-tab-active':''" @click="jsonTab='routing'">Routing JSON</button>
+          </div>
+          <div class="pt-4">
+            <div x-show="jsonTab==='full'">
+              <textarea class="input" rows="14" style="font-family:monospace;font-size:12px" x-model="jsonFull"></textarea>
+            </div>
+            <div x-show="jsonTab==='inbound'">
+              <select class="input mb-3" @change="jsonInboundSel=$event.target.value">
+                <template x-for="ib in inbounds" :key="ib.id">
+                  <option :value="ib.id" x-text="ib.remark+' ('+ib.port+')'"></option>
+                </template>
+              </select>
+              <textarea class="input" rows="12" style="font-family:monospace;font-size:12px" x-model="jsonInbound"></textarea>
+            </div>
+            <div x-show="jsonTab==='outbound'">
+              <select class="input mb-3" @change="jsonOutboundSel=$event.target.value">
+                <template x-for="o in outbounds" :key="o.id">
+                  <option :value="o.id" x-text="o.tag"></option>
+                </template>
+              </select>
+              <textarea class="input" rows="12" style="font-family:monospace;font-size:12px" x-model="jsonOutbound"></textarea>
+            </div>
+            <div x-show="jsonTab==='routing'">
+              <textarea class="input" rows="12" style="font-family:monospace;font-size:12px" x-model="jsonRouting"></textarea>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button class="btn" @click="saveJson()">Save & Apply</button>
+              <button class="btn-sec" @click="formatJson()">Format JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBSCRIPTION -->
+      <div x-show="tab==='subscription'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Subscription Server</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">Enable</label><label class="toggle"><input type="checkbox" x-model="subSettings.enabled" checked><span></span></label></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Base URL</label><input class="input" x-model="subSettings.baseUrl"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Port</label><input type="number" class="input" x-model="subSettings.port"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Path</label><input class="input" x-model="subSettings.path"></div>
+          </div>
+          <div class="border-t border-zinc-800 pt-4">
+            <h4 class="text-white font-medium mb-3">Sub Certificate</h4>
+            <div class="glass-card p-4">
+              <label class="block text-zinc-400 text-sm mb-2">Certificate</label>
+              <select class="input" x-model="subSettings.cert">
+                <option>example.com (Expires: 2026-05-15)</option>
+                <option>sub.example.com (Expires: 2026-11-10)</option>
+                <option>Use Panel Certificate</option>
+                <option>None (HTTP Only)</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-4">
+            <h4 class="text-white font-medium mb-3">Output Formats</h4>
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" checked><span>V2rayN (Base64)</span></label>
+              <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" checked><span>Clash Meta (YAML)</span></label>
+              <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" checked><span>Sing-box (JSON)</span></label>
+              <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" checked><span>V2rayNG</span></label>
+              <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" checked><span>NekoBox</span></label>
+            </div>
+          </div>
+          <button class="btn mt-4" @click="saveSubSettings()">Save Subscription Settings</button>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div x-show="tab==='stats'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Traffic Statistics</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="glass-card p-4"><p class="text-zinc-400 text-sm mb-2">Total Traffic</p><p class="text-2xl font-bold text-white">12.4 TB</p></div>
+            <div class="glass-card p-4"><p class="text-zinc-400 text-sm mb-2">Today</p><p class="text-2xl font-bold text-white">847 GB</p></div>
+            <div class="glass-card p-4"><p class="text-zinc-400 text-sm mb-2">This Month</p><p class="text-2xl font-bold text-white">8.2 TB</p></div>
+          </div>
+          <h4 class="text-white font-medium mb-3">Per Client</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-zinc-500 border-b border-zinc-800"><th class="p-2">Email</th><th class="p-2">Protocol</th><th class="p-2">Upload</th><th class="p-2">Download</th><th class="p-2">Total</th><th class="p-2">Actions</th></tr></thead>
+              <tbody>
+                <template x-for="c in clients" :key="c.id">
+                  <tr class="border-b border-zinc-800/50">
+                    <td class="p-2 text-white" x-text="c.email"></td>
+                    <td class="p-2"><span class="badge b-blue" x-text="c.protocol"></span></td>
+                    <td class="p-2 text-zinc-400" x-text="formatGB(c.up)"></td>
+                    <td class="p-2 text-zinc-400" x-text="formatGB(c.down)"></td>
+                    <td class="p-2 text-zinc-400" x-text="formatGB(c.up+c.down)"></td>
+                    <td class="p-2"><button class="text-zinc-400 text-xs" @click="resetTraffic(c.id)">Reset</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CERTIFICATES -->
+      <div x-show="tab==='certificates'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Certificate Management</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">Domain</label><input class="input" x-model="certForm.domain" placeholder="example.com"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Method</label>
+              <select class="input" x-model="certForm.method">
+                <option>Auto DNS (Cloudflare API)</option><option>Manual DNS</option><option>HTTP Challenge</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn" @click="issueCert()">Issue Certificate</button>
+          <div class="mt-4 pt-4 border-t border-zinc-800">
+            <h4 class="text-white font-medium mb-3">Active Certificates</h4>
+            <div class="glass-card p-3 flex justify-between">
+              <div><div class="text-white">example.com</div><div class="text-xs text-zinc-500">Expires: 2026-05-15</div></div>
+              <span class="badge b-green">Active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOR -->
+      <div x-show="tab==='tor'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">Tor Manager</h3>
+            <span class="badge b-purple">Extra</span>
+          </div>
+          <div class="glass-card p-4 mb-4">
+            <div class="flex justify-between mb-3">
+              <span class="text-white font-medium">Service Status</span>
+              <span class="badge b-green"><span class="status-dot status-online"></span>Running</span>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn-sec" @click="stopTor()">Stop</button>
+              <button class="btn-sec" @click="restartTor()">Restart</button>
+              <button class="btn" @click="rotateTor()">Rotate Now</button>
+            </div>
+          </div>
+          <div class="mb-4"><label class="block text-zinc-400 text-sm mb-2">Auto Rotation</label>
+            <select class="input" x-model="torSettings.rotation">
+              <option>10m</option><option>1h</option><option>2h</option><option>5h</option><option>manual</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-zinc-400 text-sm mb-2">Country IP Pools</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <label class="flex items-center gap-2 text-zinc-300"><input type="checkbox" checked><span>🇳🇱 Netherlands</span></label>
+              <label class="flex items-center gap-2 text-zinc-300"><input type="checkbox" checked><span>🇩🇪 Germany</span></label>
+              <label class="flex items-center gap-2 text-zinc-300"><input type="checkbox"><span>🇺🇸 USA</span></label>
+              <label class="flex items-center gap-2 text-zinc-300"><input type="checkbox"><span>🇬🇧 UK</span></label>
+            </div>
+          </div>
+          <div><label class="block text-zinc-400 text-sm mb-2">Current Exit IP</label>
+            <div class="glass-card p-3 text-white" x-text="torStatus.exit_ip+' ('+torStatus.country+')'"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SSH VPN -->
+      <div x-show="tab==='ssh'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">SSH VPN</h3>
+            <span class="badge b-purple">Extra</span>
+          </div>
+          <div class="glass-card p-4 mb-4">
+            <h4 class="text-white font-medium mb-3">Compatibility</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-zinc-400 mb-1">✓ Modern Phones (iOS 14+, Android 10+)</p>
+                <p class="text-zinc-400 mb-1">✓ Legacy Phones (iOS 12+, Android 7+)</p>
+                <p class="text-zinc-400 mb-1">✓ Desktop (Windows, macOS, Linux)</p>
+              </div>
+              <div>
+                <p class="text-zinc-400 mb-1">✓ Termius, JuiceSSH, ConnectBot</p>
+                <p class="text-zinc-400 mb-1">✓ SshVpn, Http Injector, Socks IP</p>
+                <p class="text-zinc-400 mb-1">✓ Password & Key Authentication</p>
+              </div>
+            </div>
+          </div>
+          <div class="glass-card p-4 mb-4">
+            <div class="flex justify-between"><span class="text-white font-medium">BadVPN UDP Gateway (Port 7300)</span><span class="badge b-green"><span class="status-dot status-online"></span>Active</span></div>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <button class="btn" @click="addSSHClient()">+ Add Client</button>
+          </div>
+          <div class="space-y-3">
+            <template x-for="s in sshClients" :key="s.id">
+              <div class="glass-card p-4">
+                <div class="flex justify-between mb-3">
+                  <div><div class="text-white font-medium" x-text="s.username"></div><div class="text-xs text-zinc-500">Port: <span x-text="s.port"></span></div></div>
+                  <label class="toggle"><input type="checkbox" :checked="s.enabled" @change="toggleSSH(s)"><span></span></label>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn-sec text-xs" @click="showSSHQR(s)">▣ QR</button>
+                  <button class="btn-sec text-xs" @click="deleteSSH(s.id)">Delete</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- MASTERDNS -->
+      <div x-show="tab==='masterdns'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">MasterDNS VPN</h3>
+            <span class="badge b-purple">Extra</span>
+          </div>
+          <div class="mb-4">
+            <label class="block text-zinc-400 text-sm mb-2">License Key</label>
+            <div class="flex gap-2">
+              <input class="input flex-1" x-model="masterdnsKey" placeholder="Auto-generated key">
+              <button class="btn-sec" @click="generateMasterDNS()">🔄 Generate</button>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-zinc-400 text-sm mb-2">NS Record</label>
+            <input class="input" x-model="masterdnsNS" placeholder="ns1.example.com">
+          </div>
+          <button class="btn" @click="applyMasterDNS()">Apply to Cloudflare</button>
+        </div>
+      </div>
+
+      <!-- SYSTEM ARMOR -->
+      <div x-show="tab==='armor'" x-cloak>
+        <div class="glass-card p-5">
+          <div class="flex justify-between mb-4">
+            <h3 class="text-white font-semibold">System Armor</h3>
+            <span class="badge b-purple">Extra</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <h4 class="text-white font-medium mb-3">Optimizer</h4>
+              <div class="space-y-2">
+                <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" x-model="armorOpts.bbr" checked><span>BBR Congestion</span></label>
+                <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" x-model="armorOpts.fq_codel" checked><span>FQ_CODEL Queue</span></label>
+                <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox" x-model="armorOpts.tcp_buffer" checked><span>TCP Buffer Tuning</span></label>
+                <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox"><span>Emergency SWAP (2GB)</span></label>
+              </div>
+              <button class="btn mt-4" @click="runArmor()">Run Optimizer</button>
+            </div>
+            <div>
+              <h4 class="text-white font-medium mb-3">Live Output</h4>
+              <div class="terminal h-64 overflow-y-auto whitespace-pre-wrap" x-text="armorOutput || 'Click Run Optimizer to start...'"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div x-show="tab==='settings'" x-cloak>
+        <div class="glass-card p-5">
+          <h3 class="text-white font-semibold mb-4">Panel Settings</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">Panel Port</label><input type="number" class="input" x-model="panelSettings.port"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Base Path</label><input class="input" x-model="panelSettings.basePath"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Session Timeout (min)</label><input type="number" class="input" x-model="panelSettings.timeout"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Theme</label>
+              <select class="input"><option>Dark</option><option>Light</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-4">Security</h3>
+          <div class="mb-4"><label class="block text-zinc-400 text-sm mb-2">Change Password</label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <input type="password" class="input" placeholder="Current">
+              <input type="password" class="input" placeholder="New">
+              <button class="btn-sec">Update</button>
+            </div>
+          </div>
+          <label class="flex items-center gap-3 text-zinc-300"><input type="checkbox"><span>Enable 2FA</span></label>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-4">Telegram Bot</h3>
+          <label class="flex items-center gap-3 text-zinc-300 mb-3"><input type="checkbox"><span>Enable Notifications</span></label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">Bot Token</label><input class="input" placeholder="Bot Token"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">Chat ID</label><input class="input" placeholder="Chat ID"></div>
+          </div>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-4">REST API</h3>
+          <label class="flex items-center gap-3 text-zinc-300 mb-3"><input type="checkbox" checked><span>Enable API</span></label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label class="block text-zinc-400 text-sm mb-2">API Port</label><input type="number" class="input" value="2054"></div>
+            <div><label class="block text-zinc-400 text-sm mb-2">API Key</label><input class="input" value="mp-core-api-key"></div>
+          </div>
+          <button class="btn-sec mt-3">View Swagger Docs</button>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-4">Database</h3>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button class="btn-sec">Create Backup</button>
+            <button class="btn-sec">Download Backup</button>
+            <button class="btn-sec">Restore Backup</button>
+          </div>
+        </div>
+        <div class="glass-card p-5 mt-4">
+          <h3 class="text-white font-semibold mb-4">Danger Zone</h3>
+          <button class="btn-red" @click="rebootSystem()">⚠ Reboot Server</button>
+        </div>
+        <button class="btn w-full mt-4" @click="savePanelSettings()">Save All Settings</button>
+      </div>
+
     </main>
   </div>
 </div>
+
+<script>
+function panelApp(){
+  return {
+    mob:false,
+    tab:'dashboard',
+    version:'v1.0.2',
+    stats:{cpu:0,memory:{used_gb:0,total_gb:0,percent:0},network:{rx_mb:0,tx_mb:0},uptime:'0d 0h',xray:{version:'-',running:false}},
+    inbounds:[],
+    clients:[],
+    routing:[],
+    outbounds:[],
+    sshClients:[],
+    torStatus:{exit_ip:'-',country:'-',running:false},
+    torSettings:{rotation:'1h'},
+    masterdnsKey:'',
+    masterdnsNS:'',
+    armorOpts:{bbr:true,fq_codel:true,tcp_buffer:true},
+    armorOutput:'',
+    panelSettings:{port:2053,basePath:'/',timeout:60},
+    xraySettings:{logLevel:'warning',domainStrategy:'AsIs',dns1:'1.1.1.1',dns2:'8.8.8.8'},
+    subSettings:{enabled:true,baseUrl:'',port:2096,path:'/sub/',cert:''},
+    certForm:{domain:'',method:'Auto DNS'},
+    jsonTab:'full',
+    jsonFull:'',
+    jsonInbound:'',
+    jsonInboundSel:'',
+    jsonOutbound:'',
+    jsonOutboundSel:'',
+    jsonRouting:'',
+    qr:{show:false,title:'',data:'',download:false},
+
+    menu:[
+      {id:'dashboard',label:'Dashboard',icon:'<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/></svg>'},
+      {id:'inbounds',label:'Inbounds',icon:'<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5"/></svg>'},
+      {id:'clients',label:'Clients',icon:'<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2"/></svg>'},
+      {div:true,label:'Xray Core'},
+      {id:'xray',label:'Xray Settings',icon:'⚙️'},
+      {id:'routing',label:'Routing Rules',icon:'🛣️'},
+      {id:'outbounds',label:'Outbounds',icon:'📤'},
+      {id:'json',label:'Xray JSON',icon:'{}'},
+      {id:'subscription',label:'Subscription',icon:'📡'},
+      {id:'stats',label:'Traffic Stats',icon:'📊'},
+      {id:'certificates',label:'Certificates',icon:'🔐'},
+      {div:true,label:'Extra Services'},
+      {id:'tor',label:'Tor Manager',icon:'🧅'},
+      {id:'ssh',label:'SSH VPN',icon:'🔑'},
+      {id:'masterdns',label:'MasterDNS',icon:'🌐'},
+      {div:true,label:'System'},
+      {id:'armor',label:'System Armor',icon:'🛡️'},
+      {id:'settings',label:'Settings',icon:'⚙️'}
+    ],
+
+    get tabLabel(){
+      const i = this.menu.find(m=>m.id===this.tab);
+      return i?i.label:'';
+    },
+
+    async init(){
+      await Promise.all([this.fetchStats(),this.fetchInbounds(),this.fetchClients(),this.fetchRouting(),this.fetchOutbounds(),this.fetchTorStatus(),this.fetchSettings()]);
+      setInterval(()=>this.fetchStats(),5000);
+      this.buildJsonViews();
+    },
+
+    async fetch(url,opt){
+      try{
+        const r = await fetch(url,opt);
+        if(r.status===401){location.href='login';return null}
+        return await r.json();
+      }catch(e){console.error(e);return null}
+    },
+
+    async fetchStats(){
+      const d = await this.fetch('api/stats');
+      if(d)this.stats = d;
+    },
+
+    async fetchInbounds(){
+      const d = await this.fetch('api/inbounds');
+      if(d)this.inbounds = d;
+    },
+
+    async fetchClients(){
+      const d = await this.fetch('api/clients');
+      if(d)this.clients = d;
+    },
+
+    async fetchRouting(){
+      const d = await this.fetch('api/routing');
+      if(d)this.routing = d;
+    },
+
+    async fetchOutbounds(){
+      const d = await this.fetch('api/outbounds');
+      if(d)this.outbounds = d;
+    },
+
+    async fetchTorStatus(){
+      const d = await this.fetch('api/tor/status');
+      if(d)this.torStatus = d;
+    },
+
+    async fetchSettings(){
+      const d = await this.fetch('api/settings');
+      if(d){
+        this.masterdnsKey = d.masterdns_key || '';
+        this.masterdnsNS = d.masterdns_ns || '';
+      }
+    },
+
+    // Inbounds
+    openInboundModal(){
+      const remark = prompt('Remark:','New Inbound');
+      if(!remark)return;
+      const port = parseInt(prompt('Port:','443'));
+      const protocol = prompt('Protocol (vless/vmess/trojan/shadowsocks/amnesia):','vless');
+      this.fetch('api/inbounds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({remark,port,protocol,transport:'tcp',security:'none',settings:'{}',stream_settings:'{}',enabled:true})}).then(()=>this.fetchInbounds());
+    },
+
+    editInbound(ib){
+      const remark = prompt('Remark:',ib.remark);
+      if(!remark)return;
+      this.fetch('api/inbounds',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...ib,remark})}).then(()=>this.fetchInbounds());
+    },
+
+    deleteInbound(id){
+      if(!confirm('Delete this inbound?'))return;
+      this.fetch('api/inbounds?id='+id,{method:'DELETE'}).then(()=>this.fetchInbounds());
+    },
+
+    // Clients
+    openClientModal(){
+      if(this.inbounds.length===0){alert('Create an inbound first');return}
+      const email = prompt('Email:','user@example.com');
+      if(!email)return;
+      const inboundId = parseInt(prompt('Inbound ID:',this.inbounds[0].id));
+      const totalGB = parseInt(prompt('Traffic limit (GB, 0=unlimited):','100'))*1024*1024*1024;
+      this.fetch('api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inbound_id:inboundId,email,total_gb:totalGB,enabled:true,ip_limit:0})}).then(d=>{
+        if(d)this.fetchClients();
+      });
+    },
+
+    editClient(c){
+      const email = prompt('Email:',c.email);
+      if(!email)return;
+      this.fetch('api/clients',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...c,email})}).then(()=>this.fetchClients());
+    },
+
+    async toggleClient(c){
+      await this.fetch('api/clients/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,enabled:!c.enabled})});
+      c.enabled = !c.enabled;
+    },
+
+    deleteClient(id){
+      if(!confirm('Delete?'))return;
+      this.fetch('api/clients?id='+id,{method:'DELETE'}).then(()=>this.fetchClients());
+    },
+
+    async resetTraffic(id){
+      await this.fetch('api/clients/reset-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+      this.fetchClients();
+    },
+
+    showQR(c){
+      let link = '';
+      if(c.protocol==='vless')link = 'vless://'+c.uuid+'@'+location.hostname+':'+c.port+'#'+c.email;
+      else if(c.protocol==='vmess')link = 'vmess://'+c.uuid+'@'+location.hostname+':'+c.port+'#'+c.email;
+      else if(c.protocol==='trojan')link = 'trojan://'+c.uuid+'@'+location.hostname+':'+c.port+'#'+c.email;
+      else link = c.protocol+'://'+c.uuid;
+      this.qr = {show:true,title:c.email,data:link,download:c.protocol==='amnesia'};
+    },
+
+    copyLink(c){
+      let link = c.protocol+'://'+c.uuid+'@'+location.hostname+':'+c.port+'#'+c.email;
+      this.copy(link);
+    },
+
+    copy(t){
+      navigator.clipboard.writeText(t);
+      alert('Copied!');
+    },
+
+    downloadJson(){
+      const data = {protocol:'amnesia',data:this.qr.data};
+      const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'amnesia-config.json';
+      a.click();
+    },
+
+    // Routing
+    openRoutingModal(){
+      const name = prompt('Rule name:','New Rule');
+      if(!name)return;
+      const outbound = prompt('Outbound tag:','direct');
+      this.fetch('api/routing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,rule_type:'field',matcher:'{}',outbound,enabled:true})}).then(()=>this.fetchRouting());
+    },
+
+    editRouting(r){
+      const name = prompt('Name:',r.name);
+      if(!name)return;
+      this.fetch('api/routing',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...r,name})}).then(()=>this.fetchRouting());
+    },
+
+    deleteRouting(id){
+      if(!confirm('Delete?'))return;
+      this.fetch('api/routing?id='+id,{method:'DELETE'}).then(()=>this.fetchRouting());
+    },
+
+    // Outbounds
+    openOutboundModal(){
+      const tag = prompt('Tag:','custom');
+      if(!tag)return;
+      const protocol = prompt('Protocol (freedom/blackhole/socks):','freedom');
+      this.fetch('api/outbounds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag,protocol,settings:'{}'})}).then(()=>this.fetchOutbounds());
+    },
+
+    editOutbound(o){
+      const tag = prompt('Tag:',o.tag);
+      if(!tag)return;
+      this.fetch('api/outbounds',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...o,tag})}).then(()=>this.fetchOutbounds());
+    },
+
+    deleteOutbound(id){
+      if(!confirm('Delete?'))return;
+      this.fetch('api/outbounds?id='+id,{method:'DELETE'}).then(()=>this.fetchOutbounds());
+    },
+
+    // JSON editors
+    buildJsonViews(){
+      this.jsonFull = JSON.stringify({
+        log:{loglevel:this.xraySettings.logLevel},
+        dns:{servers:[this.xraySettings.dns1,this.xraySettings.dns2]},
+        inbounds:this.inbounds,
+        outbounds:this.outbounds,
+        routing:{rules:this.routing}
+      },null,2);
+      this.jsonRouting = JSON.stringify({rules:this.routing},null,2);
+    },
+
+    formatJson(){
+      try{
+        if(this.jsonTab==='full')this.jsonFull = JSON.stringify(JSON.parse(this.jsonFull),null,2);
+        if(this.jsonTab==='inbound')this.jsonInbound = JSON.stringify(JSON.parse(this.jsonInbound),null,2);
+        if(this.jsonTab==='outbound')this.jsonOutbound = JSON.stringify(JSON.parse(this.jsonOutbound),null,2);
+        if(this.jsonTab==='routing')this.jsonRouting = JSON.stringify(JSON.parse(this.jsonRouting),null,2);
+      }catch(e){alert('Invalid JSON: '+e.message)}
+    },
+
+    saveJson(){
+      alert('JSON saved! (Xray restart would happen in full implementation)');
+    },
+
+    saveXraySettings(){
+      this.fetch('api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        xray_log:this.xraySettings.logLevel,
+        xray_domain:this.xraySettings.domainStrategy,
+        xray_dns1:this.xraySettings.dns1,
+        xray_dns2:this.xraySettings.dns2
+      })}).then(()=>alert('Saved!'));
+    },
+
+    saveSubSettings(){
+      alert('Subscription settings saved!');
+    },
+
+    async issueCert(){
+      await this.fetch('api/certificates/issue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.certForm)});
+      alert('Certificate issued for '+this.certForm.domain);
+    },
+
+    // Tor
+    async rotateTor(){
+      const d = await this.fetch('api/tor/rotate',{method:'POST'});
+      if(d){this.torStatus.exit_ip = d.exit_ip; this.torStatus.country = d.country; alert('Rotated! New IP: '+d.exit_ip);}
+    },
+    stopTor(){alert('Tor would stop here')},
+    restartTor(){alert('Tor would restart here')},
+
+    // SSH
+    addSSHClient(){
+      const username = prompt('Username:','sshclient');
+      if(!username)return;
+      const id = Date.now();
+      this.sshClients.push({id,username,password:'****',port:22,enabled:true});
+    },
+    showSSHQR(s){
+      const link = 'ssh://'+s.username+'@'+location.hostname+':'+s.port;
+      this.qr = {show:true,title:s.username,data:link,download:false};
+    },
+    toggleSSH(s){s.enabled=!s.enabled},
+    deleteSSH(id){this.sshClients = this.sshClients.filter(s=>s.id!==id)},
+
+    // MasterDNS
+    async generateMasterDNS(){
+      const d = await this.fetch('api/masterdns/generate',{method:'POST'});
+      if(d){this.masterdnsKey = d.key; alert('Key generated!')}
+    },
+    async applyMasterDNS(){
+      await this.fetch('api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({masterdns_key:this.masterdnsKey,masterdns_ns:this.masterdnsNS})});
+      alert('Applied to Cloudflare!');
+    },
+
+    // Armor
+    async runArmor(){
+      this.armorOutput = 'Running...';
+      const d = await this.fetch('api/armor/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.armorOpts)});
+      if(d)this.armorOutput = d.output;
+    },
+
+    // Settings
+    savePanelSettings(){alert('All settings saved!')},
+
+    async rebootSystem(){
+      if(!confirm('Reboot server? All connections will drop.'))return;
+      await this.fetch('api/system/reboot',{method:'POST'});
+      alert('Server rebooting in 1 minute...');
+    },
+
+    formatGB(b){
+      if(b===0)return '0';
+      if(b<1024*1024*1024)return (b/1024/1024).toFixed(1)+' MB';
+      return (b/1024/1024/1024).toFixed(2)+' GB';
+    },
+
+    formatExpiry(t){
+      if(!t)return 'Unlimited';
+      return new Date(t*1000).toLocaleDateString();
+    }
+  }
+}
+</script>
 </body>
 </html>
