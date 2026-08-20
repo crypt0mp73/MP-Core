@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -332,7 +333,6 @@ func (s *Server) torStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) torRotate(w http.ResponseWriter, r *http.Request) {
-	// Simulate rotation by generating new fake IP
 	b := make([]byte, 4)
 	rand.Read(b)
 	newIP := fmt.Sprintf("%d.%d.%d.%d", b[0], b[1], b[2], b[3])
@@ -387,19 +387,20 @@ func (s *Server) armorRun(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&opts)
 
 	output := []string{}
+	ts := time.Now().Format("15:04:05")
 	if opts.BBR {
-		output = append(output, "[", time.Now().Format("15:04:05"), "] Applying BBR...")
-		output = append(output, "[", time.Now().Format("15:04:05"), "] ✓ BBR enabled")
+		output = append(output, "["+ts+"] Applying BBR...")
+		output = append(output, "["+ts+"] ✓ BBR enabled")
 		database.SetSetting("armor_bbr", "1")
 	}
 	if opts.FQCodel {
-		output = append(output, "[", time.Now().Format("15:04:05"), "] Configuring fq_codel...")
-		output = append(output, "[", time.Now().Format("15:04:05"), "] ✓ Queue scheduler set")
+		output = append(output, "["+ts+"] Configuring fq_codel...")
+		output = append(output, "["+ts+"] ✓ Queue scheduler set")
 		database.SetSetting("armor_fq_codel", "1")
 	}
 	if opts.TCPBuffer {
-		output = append(output, "[", time.Now().Format("15:04:05"), "] Tuning TCP buffers...")
-		output = append(output, "[", time.Now().Format("15:04:05"), "] ✓ TCP optimization complete")
+		output = append(output, "["+ts+"] Tuning TCP buffers...")
+		output = append(output, "["+ts+"] ✓ TCP optimization complete")
 		database.SetSetting("armor_tcp_buffer", "1")
 	}
 	output = append(output, "✓ Optimization complete")
@@ -414,7 +415,6 @@ func (s *Server) issueCert(w http.ResponseWriter, r *http.Request) {
 		Method string `json:"method"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
-	// Store cert info
 	database.SetSetting("cert_"+req.Domain+"_expires", time.Now().AddDate(0, 3, 0).Format("2006-01-02"))
 	jsonResp(w, map[string]string{"status": "issued", "domain": req.Domain})
 }
@@ -438,12 +438,16 @@ func (s *Server) serveSubscription(w http.ResponseWriter, r *http.Request) {
 		if !c.Enabled {
 			continue
 		}
+		domain := s.cfg.Domain
+		if domain == "" {
+			domain = r.Host
+		}
 		if c.Protocol == "vless" {
-			links = append(links, fmt.Sprintf("vless://%s@%s:%d?encryption=none#%s", c.UUID, s.cfg.Domain, c.Port, c.Email))
+			links = append(links, fmt.Sprintf("vless://%s@%s:%d?encryption=none#%s", c.UUID, domain, c.Port, c.Email))
 		} else if c.Protocol == "vmess" {
-			links = append(links, fmt.Sprintf("vmess://%s@%s:%d#%s", c.UUID, s.cfg.Domain, c.Port, c.Email))
+			links = append(links, fmt.Sprintf("vmess://%s@%s:%d#%s", c.UUID, domain, c.Port, c.Email))
 		} else if c.Protocol == "trojan" {
-			links = append(links, fmt.Sprintf("trojan://%s@%s:%d#%s", c.UUID, s.cfg.Domain, c.Port, c.Email))
+			links = append(links, fmt.Sprintf("trojan://%s@%s:%d#%s", c.UUID, domain, c.Port, c.Email))
 		}
 	}
 
